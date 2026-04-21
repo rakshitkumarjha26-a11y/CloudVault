@@ -1,0 +1,116 @@
+{% extends 'base.html' %}
+{% block title %}Trash — CloudVault{% endblock %}
+{% block content %}
+<div class="dashboard">
+  <aside class="sidebar">
+    <div class="sb-logo"><span class="sb-logo-icon">☁</span><span class="sb-logo-text">CloudVault</span></div>
+    <nav class="sb-nav">
+      <a href="{{ url_for('dashboard') }}" class="sb-item">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 4h12v1H2zM2 7h9v1H2zM2 10h11v1H2z"/></svg>
+        My Files
+      </a>
+      <a href="{{ url_for('trash') }}" class="sb-item active">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M3 3h10v1H3zm1 2h8l-.8 7H4.8L4 5zm2.5 1v5h1V6h-1zm3 0v5h1V6h-1z"/></svg>
+        Trash
+        {% if total_files > 0 %}<span class="trash-badge">{{ total_files }}</span>{% endif %}
+      </a>
+    </nav>
+    <div class="cloud-info-box">
+      <div class="ci-title">🗑 Trash Info</div>
+      <div class="ci-row">Files here are <b>soft-deleted</b></div>
+      <div class="ci-row">Restore or permanently delete</div>
+    </div>
+    <div class="user-row">
+      <div class="user-avatar">{{ session.user_name[0].upper() }}</div>
+      <div class="user-info">
+        <div class="user-name-sb">{{ session.user_name }}</div>
+        <div class="user-email-sb">{{ session.user_email }}</div>
+      </div>
+      <a href="{{ url_for('logout') }}" class="user-logout" title="Logout">↩</a>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <header class="topbar">
+      <div>
+        <h1 class="topbar-title">🗑 Trash</h1>
+        <p class="topbar-sub">{{ total_files }} deleted file{{ 's' if total_files != 1 else '' }}</p>
+      </div>
+      <div class="topbar-actions">
+        <button class="theme-toggle" onclick="toggleTheme()">🌙</button>
+        {% if files %}
+        <form method="POST" action="{{ url_for('empty_trash') }}"
+              onsubmit="return confirm('Permanently delete ALL files in trash? This cannot be undone.')">
+          <button type="submit" class="btn-danger">Empty Trash</button>
+        </form>
+        {% endif %}
+      </div>
+    </header>
+
+    <div class="files-area" style="padding:1rem 1.5rem;">
+      {% if files %}
+      <div class="trash-notice">
+        Files in Trash will not count toward your storage until permanently deleted.
+        <b>Restore</b> to recover a file, or <b>Delete Forever</b> to remove it permanently.
+      </div>
+      <table class="files-table">
+        <thead>
+          <tr>
+            <th>File</th>
+            <th>Type</th>
+            <th>Size</th>
+            <th>Deleted</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for file in files %}
+          <tr class="file-row">
+            <td>
+              <div class="file-name-cell">
+                <div class="file-icon-wrap" style="opacity:0.5;">
+                  {% if file.file_type in ['PNG','JPG','JPEG','GIF'] %}🖼️
+                  {% elif file.file_type in ['PDF'] %}📄
+                  {% elif file.file_type in ['DOC','DOCX'] %}📝
+                  {% elif file.file_type in ['ZIP'] %}🗜️
+                  {% elif file.file_type in ['MP4'] %}🎬
+                  {% else %}📁{% endif %}
+                </div>
+                <div>
+                  <div class="file-name" style="opacity:0.7;">{{ file.original_name }}</div>
+                  <div class="file-name-sub">{{ file.category }}</div>
+                </div>
+              </div>
+            </td>
+            <td><span class="type-badge">{{ file.file_type }}</span></td>
+            <td class="file-size">{{ file.size_readable }}</td>
+            <td class="file-date">
+              {% if file.deleted_at %}{{ file.deleted_at.strftime('%d %b %Y, %I:%M %p') }}{% else %}—{% endif %}
+            </td>
+            <td>
+              <div class="action-row">
+                <form method="POST" action="{{ url_for('restore', file_id=file.id) }}">
+                  <button type="submit" class="btn-action btn-restore">↩ Restore</button>
+                </form>
+                <form method="POST" action="{{ url_for('delete_permanent', file_id=file.id) }}"
+                      onsubmit="return confirm('Permanently delete \'{{ file.original_name }}\'? Cannot be undone.')">
+                  <button type="submit" class="btn-action btn-del">✕ Delete Forever</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty-state">
+        <div class="empty-icon">🗑</div>
+        <h3>Trash is empty</h3>
+        <p>Deleted files will appear here.</p>
+        <a href="{{ url_for('dashboard') }}" class="btn-primary">Back to Files</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

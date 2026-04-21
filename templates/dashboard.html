@@ -1,0 +1,225 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard — CloudVault{% endblock %}
+{% block content %}
+<div class="dashboard">
+
+  <!-- ══ SIDEBAR ══ -->
+  <aside class="sidebar">
+    <div class="sb-logo">
+      <span class="sb-logo-icon">☁</span>
+      <span class="sb-logo-text">CloudVault</span>
+    </div>
+    <nav class="sb-nav">
+      <a href="{{ url_for('dashboard') }}" class="sb-item active">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 4h12v1H2zM2 7h9v1H2zM2 10h11v1H2z"/></svg>
+        My Files
+      </a>
+      <a href="{{ url_for('trash') }}" class="sb-item">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M3 3h10v1H3zm1 2h8l-.8 7H4.8L4 5zm2.5 1v5h1V6h-1zm3 0v5h1V6h-1z"/></svg>
+        Trash
+        {% if trash_count > 0 %}<span class="trash-badge">{{ trash_count }}</span>{% endif %}
+      </a>
+    </nav>
+
+    <!-- Category quick-links -->
+    {% if cat_groups %}
+    <div class="sb-section-label">Categories</div>
+    {% for cat, data in cat_groups.items() %}
+    <button class="sb-cat-item" onclick="scrollToCategory('cat-{{ cat }}')">
+      <span>{{ data.icon }}</span>
+      <span class="sb-cat-name">{{ cat }}</span>
+      <span class="sb-cat-count">{{ data.files|length }}</span>
+    </button>
+    {% endfor %}
+    {% endif %}
+
+    <div class="storage-widget">
+      <div class="sw-row">
+        <span class="sw-label">Storage</span>
+        <span class="sw-count">{{ total_files }} file{{ 's' if total_files != 1 else '' }}</span>
+      </div>
+      <div class="sw-bar"><div class="sw-fill" style="width:{{ [[total_size_bytes/(5*1024*1024*1024)*100,2]|max,100]|min }}%;"></div></div>
+      <div class="sw-used">{{ total_size }} of 5 GB used</div>
+    </div>
+
+    <div class="user-row">
+      <div class="user-avatar">{{ session.user_name[0].upper() }}</div>
+      <div class="user-info">
+        <div class="user-name-sb">{{ session.user_name }}</div>
+        <div class="user-email-sb">{{ session.user_email }}</div>
+      </div>
+      <a href="{{ url_for('logout') }}" class="user-logout" title="Logout">↩</a>
+    </div>
+  </aside>
+
+  <!-- ══ MAIN ══ -->
+  <div class="main-content">
+
+    <!-- Topbar -->
+    <header class="topbar">
+      <div>
+        <h1 class="topbar-title">My Files</h1>
+        <p class="topbar-sub">{{ total_files }} file{{ 's' if total_files != 1 else '' }} · {{ total_size }} used</p>
+      </div>
+      <div class="topbar-actions">
+        <button class="theme-toggle" id="theme-btn" onclick="toggleTheme()" title="Toggle theme">🌙</button>
+        <button class="btn-upload-trigger" onclick="toggleUpload()">+ Upload File</button>
+      </div>
+    </header>
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">Total Files</div>
+        <div class="stat-value">{{ total_files }}</div>
+        <div class="stat-sub">in your vault</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Storage Used</div>
+        <div class="stat-value">{{ total_size }}</div>
+        <div class="stat-sub">of 5 GB free tier</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Categories</div>
+        <div class="stat-value">{{ cat_groups|length }}</div>
+        <div class="stat-sub">file types stored</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">In Trash</div>
+        <div class="stat-value {% if trash_count > 0 %}stat-danger{% endif %}">{{ trash_count }}</div>
+        <div class="stat-sub"><a href="{{ url_for('trash') }}" class="stat-link">View trash →</a></div>
+      </div>
+    </div>
+
+    <!-- Upload panel -->
+    <div class="upload-panel" id="upload-panel">
+      <form method="POST" action="{{ url_for('upload') }}" enctype="multipart/form-data" id="upload-form">
+        <div class="drop-zone" id="drop-zone">
+          <div class="drop-zone-inner" id="drop-inner">
+            <div class="drop-icon">📤</div>
+            <p class="drop-title">Drop a file here or click to browse</p>
+            <p class="drop-hint">Images, PDFs, Docs, ZIPs · Max 10 MB</p>
+            <input type="file" name="file" id="file-input"
+                   accept=".png,.jpg,.jpeg,.gif,.pdf,.doc,.docx,.txt,.zip,.mp4,.xlsx,.pptx"
+                   style="display:none" required>
+            <button type="button" class="btn-browse" onclick="document.getElementById('file-input').click()">Choose File</button>
+          </div>
+          <div class="selected-file" id="selected-file">
+            <span>📎</span><span id="sel-name"></span><span id="sel-size" class="sel-size"></span>
+          </div>
+        </div>
+        <div class="progress-wrap" id="progress-wrap">
+          <div class="progress-meta"><span id="prog-name">Uploading…</span><span id="prog-pct">0%</span></div>
+          <div class="progress-track"><div class="progress-fill" id="prog-fill"></div></div>
+        </div>
+        <div class="upload-actions">
+          <button type="submit" class="btn-primary" id="btn-upload" disabled>Upload to Cloud ☁</button>
+          <button type="button" class="btn-cancel" onclick="closeUpload()">Cancel</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Search bar -->
+    {% if files %}
+    <div class="search-bar-wrap">
+      <svg class="search-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="6.5" cy="6.5" r="4.5"/><path d="M11 11l3 3"/>
+      </svg>
+      <input type="text" id="search-input" placeholder="Search all files…" oninput="globalSearch()">
+      <button class="search-clear" id="search-clear" onclick="clearSearch()">✕</button>
+    </div>
+
+    <!-- Global search results (hidden unless searching) -->
+    <div id="search-results-area" style="display:none;">
+      <div class="section-header"><span class="section-title">Search Results</span><span class="section-count" id="results-count"></span></div>
+      <div class="files-grid" id="search-results-grid"></div>
+      <div class="no-results" id="no-results">🔍 No files match your search.</div>
+    </div>
+
+    <!-- Category groups (shown when not searching) -->
+    <div id="categories-area">
+      {% for cat, data in cat_groups.items() %}
+      <div class="category-section" id="cat-{{ cat }}">
+        <div class="section-header" onclick="toggleSection('{{ cat }}')" style="cursor:pointer;">
+          <div class="section-left">
+            <span class="section-icon {{ data.color }}">{{ data.icon }}</span>
+            <span class="section-title">{{ cat }}</span>
+            <span class="section-count">{{ data.files|length }} file{{ 's' if data.files|length != 1 else '' }}</span>
+            <span class="section-size">· {{ data.size_readable }}</span>
+          </div>
+          <div class="section-right">
+            <span class="section-toggle" id="toggle-{{ cat }}">▾</span>
+          </div>
+        </div>
+
+        <div class="files-grid" id="grid-{{ cat }}">
+          {% for file in data.files %}
+          <div class="file-card {% if file.is_image %}file-card--image{% endif %}"
+               data-name="{{ file.original_name|lower }}"
+               data-type="{{ file.file_type|lower }}">
+
+            {% if file.is_image %}
+            <!-- Image card — clickable preview -->
+            <div class="file-card-thumb" onclick="previewImage({{ file.id }}, '{{ file.original_name }}')">
+              <img src="{{ url_for('static', filename='img/placeholder.png') }}"
+                   data-src="/preview/{{ file.id }}"
+                   class="thumb-img lazy-img"
+                   alt="{{ file.original_name }}"
+                   onerror="this.parentElement.innerHTML='<span class=thumb-fallback>🖼️</span>'">
+              <div class="thumb-overlay">
+                <span class="thumb-zoom">🔍 Preview</span>
+              </div>
+            </div>
+            {% else %}
+            <!-- Non-image card -->
+            <div class="file-card-icon {{ data.color }}">
+              {{ data.icon }}
+            </div>
+            {% endif %}
+
+            <div class="file-card-info">
+              <div class="file-card-name" title="{{ file.original_name }}">{{ file.original_name }}</div>
+              <div class="file-card-meta">{{ file.size_readable }} · {{ file.uploaded_at.strftime('%d %b %Y') }}</div>
+            </div>
+
+            <div class="file-card-actions">
+              <a href="{{ url_for('download', file_id=file.id) }}" class="btn-action btn-dl" title="Download">⬇</a>
+              <form method="POST" action="{{ url_for('delete', file_id=file.id) }}"
+                    onsubmit="return confirmDelete('{{ file.original_name }}')">
+                <button type="submit" class="btn-action btn-del" title="Move to Trash">🗑</button>
+              </form>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-icon">☁</div>
+      <h3>Your vault is empty</h3>
+      <p>Upload your first file to get started.</p>
+      <button class="btn-primary" onclick="toggleUpload()">Upload File</button>
+    </div>
+    {% endif %}
+
+  </div><!-- /main-content -->
+</div><!-- /dashboard -->
+
+<!-- ══ IMAGE PREVIEW MODAL ══ -->
+<div class="modal-overlay" id="preview-modal" onclick="closePreview(event)">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div class="modal-img-wrap">
+      <div class="modal-spinner" id="modal-spinner">⟳</div>
+      <img id="modal-img" src="" alt="" style="display:none;">
+    </div>
+    <div class="modal-info">
+      <div class="modal-name" id="modal-name"></div>
+      <div class="modal-meta" id="modal-meta"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
