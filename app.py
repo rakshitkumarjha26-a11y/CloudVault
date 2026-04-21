@@ -44,7 +44,7 @@ def get_db():
     return mysql.connector.connect(
         host='localhost',
         user='root',
-        password='pft@2009',            # ← YOUR MYSQL PASSWORD HERE
+        password='',            # ← YOUR MYSQL PASSWORD HERE
         database='cloudvault'
     )
 
